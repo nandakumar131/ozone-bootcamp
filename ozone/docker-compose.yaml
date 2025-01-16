@@ -1,0 +1,123 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# reusable fragments (see https://docs.docker.com/compose/compose-file/#extension-fields)
+x-common-config:
+  &common-config
+  image: ${OZONE_IMAGE}:${OZONE_VERSION}
+  env_file:
+    - docker-config
+
+services:
+  datanode:
+    <<: *common-config
+    environment:
+      OZONE_OPTS:
+    ports:
+      - 19864
+      - 9882
+    tty: true
+    command: ["/bin/bash"]
+    #command: ["ozone","datanode"]
+  om1:
+    <<: *common-config
+    environment:
+      #WAITFOR: scm3:9894
+      #ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
+      OZONE_OPTS:
+    ports:
+      - 9874:9874
+      - 9862
+    hostname: om1
+    tty: true
+    command: ["/bin/bash"]
+    #command: ["ozone","om"]
+  om2:
+    <<: *common-config
+    environment:
+      #WAITFOR: scm3:9894
+      #ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
+      OZONE_OPTS:
+    ports:
+      - 9874
+      - 9862
+    hostname: om2
+    tty: true
+    command: ["/bin/bash"]
+    #command: ["ozone","om"]
+  om3:
+    <<: *common-config
+    environment:
+      #WAITFOR: scm3:9894
+      #ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
+      OZONE_OPTS:
+    ports:
+      - 9874
+      - 9862
+    hostname: om3
+    tty: true
+    command: ["/bin/bash"]
+    #command: ["ozone","om"]
+  scm1:
+    <<: *common-config
+    environment:
+      #ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
+      OZONE_OPTS:
+    ports:
+      - 9876:9876
+    tty: true
+    command: ["/bin/bash"]
+    #command: ["ozone","scm"]
+  scm2:
+    <<: *common-config
+    ports:
+      - 9876
+    environment:
+      #WAITFOR: scm1:9894
+      #ENSURE_SCM_BOOTSTRAPPED: /data/metadata/scm/current/VERSION
+      OZONE_OPTS:
+    tty: true
+    command: ["/bin/bash"]
+    #command: ["ozone","scm"]
+  scm3:
+    <<: *common-config
+    ports:
+      - 9876
+    environment:
+      #WAITFOR: scm2:9894
+      #ENSURE_SCM_BOOTSTRAPPED: /data/metadata/scm/current/VERSION
+      OZONE_OPTS:
+    tty: true
+    command: ["/bin/bash"]
+    #command: ["ozone","scm"]
+  httpfs:
+    <<: *common-config
+    environment:
+      OZONE_OPTS:
+    ports:
+      - 14000:14000
+    tty: true
+    command: ["/bin/bash"]
+    #command: [ "ozone","httpfs" ]
+  s3g:
+    <<: *common-config
+    environment:
+      OZONE_OPTS:
+    ports:
+      - 9878:9878
+    tty: true
+    command: ["/bin/bash"]
+    #command: ["ozone","s3g"]

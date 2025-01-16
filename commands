@@ -1,0 +1,14 @@
+
+# SCM Commands
+ozone scm --init
+ozone scm --bootstrap
+ozone --daemin start scm
+
+# OM Commands
+ozone om --init
+ozone --daemon start om
+
+# DN Commands
+ozone --daemon start datanode
+
+# SCM Admin Commands

@@ -1,0 +1,70 @@
+
+getOzoneDir() {
+    if [ -n "$BASH_VERSION" ]; then
+      echo ${BASH_SOURCE[0]}
+    fi
+
+    if [ -n "$ZSH_VERSION" ]; then
+      echo ${(%):-%x}
+    fi
+}
+
+export OZONE_DIR=$( cd -- "$(dirname -- "$(getOzoneDir)")" &> /dev/null && pwd)
+
+if [ -z "$OZONE_DIR" ]; then
+ echo "This script only supports bash or zsh!"
+ return
+fi
+
+alias cluster-start='cd $OZONE_DIR/ozone; docker-compose up --scale datanode=3 -d'
+alias cluster-stop='cd $OZONE_DIR/ozone; docker-compose down'
+alias cluster-status='cd $OZONE_DIR/ozone; docker-compose ps'
+alias scm-ui='open http://127.0.0.1:9876/'
+alias om-ui='open http://127.0.0.1:9874/'
+
+alias lab-cluster-start='cd $OZONE_DIR/ozone-lab; docker-compose up --scale datanode=3 -d'
+alias lab-cluster-stop='cd $OZONE_DIR/ozone-lab; docker-compose down'
+alias lab-cluster-status='cd $OZONE_DIR/ozone-lab; docker-compose ps'
+
+goto () {
+    echo ssh into $(getContainerName $1)
+    docker exec -it $(getContainerName $1) /bin/bash
+}
+
+gotolab () {
+    echo ssh into $(getLabContainerName $1)
+    docker exec -it $(getLabContainerName $1) /bin/bash
+}
+
+
+getContainerName() {
+  case $1 in
+    scm1)  echo "ozone-scm1-1" ;;
+    scm2)  echo "ozone-scm2-1" ;;
+    scm3)  echo "ozone-scm3-1" ;;
+    om1)  echo "ozone-om1-1" ;;
+    om2)  echo "ozone-om2-1" ;;
+    om3)  echo "ozone-om3-1" ;;
+    dn1)  echo "ozone-datanode-1" ;;
+    dn2)  echo "ozone-datanode-2" ;;
+    dn3)  echo "ozone-datanode-3" ;;
+    *)     echo "None";;
+  esac
+}
+
+getLabContainerName() {
+  case $1 in
+    scm1)  echo "ozone-lab-scm1-1" ;;
+    scm2)  echo "ozone-lab-scm2-1" ;;
+    scm3)  echo "ozone-lab-scm3-1" ;;
+    scm4)  echo "ozone-lab-scm4-1" ;;
+    scm5)  echo "ozone-lab-scm5-1" ;;
+    om1)  echo "ozone-lab-om1-1" ;;
+    om2)  echo "ozone-lab-om2-1" ;;
+    om3)  echo "ozone-lab-om3-1" ;;
+    dn1)  echo "ozone-lab-datanode-1" ;;
+    dn2)  echo "ozone-lab-datanode-2" ;;
+    dn3)  echo "ozone-lab-datanode-3" ;;
+    *)     echo "None";;
+  esac
+}
