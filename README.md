@@ -6,28 +6,26 @@
 
 | **Timings** | **Topic** |
 | --- | --- |
-| 9:30 - 10:00 | Initialization and Start Up |
+| 09:30 - 10:00 | Initialization and Start Up |
 | 10:00 - 10:30 | SCM Architecture |
 | 10:30 - 11:00 | Node Lifecycle |
 | 11:00 - 11:15 | Break |
 | 11:15 - 11:30 | Pipeline Lifecycle |
 | 11:30 - 11:45 | Container Lifecycle |
 | 11:45 - 12:00 | Block Management |
-| 12:15 - 12:45 | Safemode |
+| 12:00 - 12:30 | Safemode |
+| 12:30 - 12:45 | Disk Layout |
 | 12:45 - 13:45 | Lunch |
-| 13:45 - 14:00 | Disk Layout |
-| 14:00 - 14:15 | High Availability |
-| 14:15 - 14:30 | Decommissioning |
-| 14:30 - 14:45 | Recover from two SCM failure |
+| 13:45 - 14:00 | High Availability |
+| 14:00 - 14:15 | Decommissioning |
+| 14:15 - 14:45 | Recover from two SCM failure |
 | 14:45 - 15:15 | Datanode Heartbeat Protocol |
-| 15: 15 - 15:30 | Break |
+| 15:15 - 15:30 | Break |
 | 15:30 - 16:00 | Container Replication |
 | 16:00 - 16:30 | Container Balancer |
 | 16:30 - 17:00 | Q & A |
 
 # Initialization and Start Up
-
----
 
 ### SCM Initialization
 
@@ -154,8 +152,6 @@ How to fix and make the cluster healthy?
 
 # SCM Architecture
 
----
-
 What does SCM manage?
 
 ![SCM.png](flowcharts/scm.png)
@@ -165,8 +161,6 @@ How does it manage?
 ![SCM Storage.drawio.png](flowcharts/scm-storage.png)
 
 # Metadata
-
----
 
 ### SCM RocksDB Tables
 
@@ -313,23 +307,73 @@ jstack <scm pid> | grep SCMBlockDeletingService
 
 # Node Lifecycle
 
----
-
+## Node State Transition
 ![node-state-transition.drawio.png](flowcharts/node-state-transition.png)
 
+## Node State Flow
 ![node-state-flow.drawio.png](flowcharts/node-state-flow.png)
 
-# Pipeline Lifecycle
+### Note
+This setup has the following configuration changes
+```bash
+ozone.scm.stale.node.interval is 1m
+ozone.scm.dead.node.interval is 2m
+```
+You can check the configs in http://127.0.0.1:9876/#!/config
 
----
+
+- What is `HEALTHY_READONLY` state?
+    - Used during upgrade
+    - The datanodes are moved to this state when SCM is finalized but the datanodes are yet to be finalized.
+
+- What happens when a datanode is marked as stale?
+- What happens when a datanode is marked as dead?
+
+
+## Exercise
+Putting Datanode into `HEALTHY_READONLY` state.
+
+Run the datanode list command to check the current state of the datanode
+```bash
+ozone admin datanode list
+```
+Stop the datanode process and manually modify the `layoutVersion` in the `VERSION` file
+```bash
+ozone --daemon stop datanode
+vi /data/metadata/dnlayoutversion/VERSION
+ozone --daemon start datanode
+```
+
+Run the datanode list command to check the current state of the datanode
+```bash
+ozone admin datanode list
+```
+
+Check if the upgrade finalization code was executed
+```bash
+grep -i finalize /var/log/hadoop/ozone-hadoop-datanode*.log
+```
+
+If a datanode is stuck in `HEALTHY_READONLY` state, it means that the datanode is not able to run upgrade finalization.
+Check the datanode logs for more details.
+
+
+### What is `Operational State`?
+- IN_SERVICE
+- ENTERING_MAINTENANCE
+- IN_MAINTENANCE
+- DECOMMISSIONING
+- DECOMMISSIONED
+
+Operational State along with Health State will give the overall state of the datanode.
+
+# Pipeline Lifecycle
 
 ![PipelineStatemachine.drawio.png](flowcharts/pipeline-statemachine.png)
 
 Pipeline failure
 
 # Container Lifecycle
-
----
 
 ![container-state-transition.drawio.png](flowcharts/container-state-transition.png)
 
@@ -341,8 +385,6 @@ Quasi closed to close — Origin Node ID logic
 
 # Block Management
 
----
-
 Block Allocation
 
 Block Deletion - Deletion Ack
@@ -352,8 +394,6 @@ Delete Block retry count - How to reset the retry count for txns
 Get the count of pending block delete transactions from SCM db
 
 # Safemode
-
----
 
 ## Pre-check
 
@@ -402,8 +442,6 @@ Try to put cluster into safemode and verify the client commands.
 
 # Disk Layout
 
----
-
 ![scm-metadata.png](flowcharts/scm-metadata.png)
 
 Cat the version file
@@ -411,8 +449,6 @@ Cat the version file
 Read Raft Log using ldb tool
 
 # High Availability
-
----
 
 ![HA Architecture.drawio.png](flowcharts/ha-architecture.png)
 
@@ -422,16 +458,10 @@ Datanodes seen by SCMs might vary if there are network partitions.
 
 # Decommissioning
 
----
-
 What happens if you remove node without decommissioning and add new nodes?
 
 # Recover from two SCM failure
 
----
-
 Ratis log parser
 
 # Datanode Heartbeat Protocol
-
----
