@@ -12,3 +12,11 @@ ozone --daemon start om
 ozone --daemon start datanode
 
 # SCM Admin Commands
+
+# Commands to write data
+ozone sh volume create /vol
+ozone sh bucket create /vol/buck
+ozone sh key put 
+ozone sh key put /vol/buck/CONTRIBUTING.md  CONTRIBUTING.md
+ozone sh key list /vol/buck
+ozone sh key cat /vol/buck/CONTRIBUTING.md

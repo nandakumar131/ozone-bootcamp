@@ -30,6 +30,16 @@ cluster () {
       fi
       cd - > /dev/null
       cluster-status ;;
+    scale)
+      cd $OZONE_DIR/ozone;
+      docker-compose ps | grep scm > /dev/null 2>&1
+      if [ $? != 0 ]; then
+          echo "Ozone not running!"
+          return 1;
+      fi
+      docker-compose up --scale datanode=6 --no-recreate -d
+      cd - > /dev/null;
+      return 0;;
     initialize)
       cd $OZONE_DIR/ozone;
       docker-compose ps | grep scm > /dev/null 2>&1
@@ -44,9 +54,9 @@ cluster () {
       docker exec $(getContainerName "scm1") ozone scm --init
       docker exec $(getContainerName "scm1") ozone --daemon start scm
       docker exec $(getContainerName "scm2") ozone scm --bootstrap
-      docker exec $(getContainerName "scm3") ozone --daemon start scm
-      docker exec $(getContainerName "scm3") ozone scm --bootstrap
       docker exec $(getContainerName "scm2") ozone --daemon start scm
+      docker exec $(getContainerName "scm3") ozone scm --bootstrap
+      docker exec $(getContainerName "scm3") ozone --daemon start scm
 
       docker exec $(getContainerName "om1") ozone om --init
       docker exec $(getContainerName "om1") ozone --daemon start om 
@@ -67,6 +77,7 @@ cluster () {
       echo "		start	-	Start Ozone Docker Cluster"
       echo "		stop 	-	Stop Ozone Docker Cluster"
       echo "		status	-	Print Ozone Docker Cluster Status"
+      echo "		scale	-	Scales the cluster to 6 datanodes"
           
   esac
 }
@@ -78,18 +89,9 @@ alias cluster-status='cd $OZONE_DIR/ozone; docker-compose ps; cd - > /dev/null'
 alias scm-ui='open http://127.0.0.1:9876/'
 alias om-ui='open http://127.0.0.1:9874/'
 
-alias lab-cluster-start='cd $OZONE_DIR/ozone-lab; docker-compose up --scale datanode=3 -d; cd - > /dev/null'
-alias lab-cluster-stop='cd $OZONE_DIR/ozone-lab; docker-compose down; cd - > /dev/null'
-alias lab-cluster-status='cd $OZONE_DIR/ozone-lab; docker-compose ps; cd - > /dev/null'
-
 goto () {
     echo ssh into $(getContainerName $1)
     docker exec -it $(getContainerName $1) /bin/bash
-}
-
-gotolab () {
-    echo ssh into $(getLabContainerName $1)
-    docker exec -it $(getLabContainerName $1) /bin/bash
 }
 
 ozone () {
@@ -103,7 +105,7 @@ ozone () {
       return 1;
     fi
     cd - >/dev/null
-    docker exec $(getContainerName "scm1") ozone $@
+    docker exec -t $(getContainerName "scm1") ozone $@
 }
 
 getContainerName() {
@@ -111,29 +113,13 @@ getContainerName() {
     scm1)  echo "ozone-scm1-1" ;;
     scm2)  echo "ozone-scm2-1" ;;
     scm3)  echo "ozone-scm3-1" ;;
-    om1)  echo "ozone-om1-1" ;;
-    om2)  echo "ozone-om2-1" ;;
-    om3)  echo "ozone-om3-1" ;;
-    dn1)  echo "ozone-datanode-1" ;;
-    dn2)  echo "ozone-datanode-2" ;;
-    dn3)  echo "ozone-datanode-3" ;;
+    om1)   echo "ozone-om1-1" ;;
+    om2)   echo "ozone-om2-1" ;;
+    om3)   echo "ozone-om3-1" ;;
+    dn1)   echo "ozone-datanode-1" ;;
+    dn2)   echo "ozone-datanode-2" ;;
+    dn3)   echo "ozone-datanode-3" ;;
     *)     echo "None";;
   esac
 }
 
-getLabContainerName() {
-  case $1 in
-    scm1)  echo "ozone-lab-scm1-1" ;;
-    scm2)  echo "ozone-lab-scm2-1" ;;
-    scm3)  echo "ozone-lab-scm3-1" ;;
-    scm4)  echo "ozone-lab-scm4-1" ;;
-    scm5)  echo "ozone-lab-scm5-1" ;;
-    om1)  echo "ozone-lab-om1-1" ;;
-    om2)  echo "ozone-lab-om2-1" ;;
-    om3)  echo "ozone-lab-om3-1" ;;
-    dn1)  echo "ozone-lab-datanode-1" ;;
-    dn2)  echo "ozone-lab-datanode-2" ;;
-    dn3)  echo "ozone-lab-datanode-3" ;;
-    *)     echo "None";;
-  esac
-}
