@@ -184,8 +184,6 @@ ozone debug ldb --db=/data/metadata/scm.db value-schema --cf=deletedBlocks | jq 
 
 ## Viewing in-memory data vs data stored in the scm db
 
----
-
 To view the metadata, we have to generate some first.
 
 ```bash
@@ -371,7 +369,46 @@ Operational State along with Health State will give the overall state of the dat
 
 ![PipelineStatemachine.drawio.png](flowcharts/pipeline-statemachine.png)
 
-Pipeline failure
+Types of Pipelines
+- Ratis
+- EC
+- Standalone
+
+Standalone Pipeline is used for reads (on Ratis Containers).
+
+Pipelines creation is a costly operation, so they are created in background and are reused.
+
+Pipeline will be closed only if
+- there is a write failure on the Pipeline.
+- there is a slow follower in the Pipeline Ratis group.
+- one of the datanode in the pipeline is marked as stale.
+- the pipeline close command is executed by admin.
+
+### Pipeline Creation Flow
+- Based on the Rack Awareness logic, the datanodes are picked for the Pipeline creation
+- The Pipeline is created on SCM and it's moved to `ALLOCATED` state
+- The SCM will send the Pipeline creation request to the datanodes that are part of the pipeline
+- The datanodes will create the pipeline and send the response (Pipeline report) back to SCM via heartbeat
+- The SCM will move the Pipeline to `OPEN` state once it received the Pipeline report
+- Now the Pipeline can be used for Container allocation.
+- The Pipelines which are in `ALLOCATED` state for a long time will be deleted by the scrubber.
+
+There are two ways in which Pipelines are created
+- Background Pipeline Creator
+- We also try to created a Pipeline if there is a write request and we don't have any open Pipeline
+
+### Pipeline Scrubber
+Pipelines in allocated state for long time will be removed by scrubber
+The timeout can be configued using `ozone.scm.pipeline.allocated.timeout`, the default value is 5 minutes.
+
+### Pipeline Close Flow
+We give some time for containers to get gracefully closed before closing the pipeline.
+This is done to avoid moving the containers to `QUASI_CLOSED` state.
+<<TODO>
+
+### Exercise
+Stop one of the datanode in the pipeline and check the pipeline state and also the state of Containers in the Pipeline.
+<<TODO>>
 
 # Container Lifecycle
 
@@ -380,8 +417,14 @@ Pipeline failure
 ![container-state-flow.drawio.png](flowcharts/container-state-flow.png)
 
 TODO: Container creation logic
+Clients create the container. The containers are directly moved to OPEN state in SCM upon creation.
+There is no allocated state for containers.
+
+3 way commit, falling back to 2 way commit.
 
 Quasi closed to close — Origin Node ID logic
+
+Replication Manager will try to retain at least one replica per unique Origin Node ID.
 
 # Block Management
 
