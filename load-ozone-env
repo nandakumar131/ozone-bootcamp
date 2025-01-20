@@ -1,3 +1,4 @@
+export DOCKER_CLI_HINTS=false
 
 getOzoneDir() {
     if [ -n "$BASH_VERSION" ]; then
@@ -16,15 +17,70 @@ if [ -z "$OZONE_DIR" ]; then
  return
 fi
 
-alias cluster-start='cd $OZONE_DIR/ozone; docker-compose up --scale datanode=3 -d'
-alias cluster-stop='cd $OZONE_DIR/ozone; docker-compose down'
-alias cluster-status='cd $OZONE_DIR/ozone; docker-compose ps'
+cluster () {
+  case $1 in
+    start)  cluster-start ;;
+    stop)  cluster-stop ;;
+    status)
+      cd $OZONE_DIR/ozone;
+      docker-compose ps | grep scm > /dev/null 2>&1
+      if [ $? != 0 ]; then
+          echo "Ozone not running!"
+          return 1;
+      fi
+      cd - > /dev/null
+      cluster-status ;;
+    initialize)
+      cd $OZONE_DIR/ozone;
+      docker-compose ps | grep scm > /dev/null 2>&1
+
+      if [ $? != 0 ]; then
+        echo "Ozone not running!"
+        echo "Start Ozone using ozone-docker command"
+        cd - > /dev/null
+        return 1;
+      fi
+      cd - >/dev/null
+      docker exec $(getContainerName "scm1") ozone scm --init
+      docker exec $(getContainerName "scm1") ozone --daemon start scm
+      docker exec $(getContainerName "scm2") ozone scm --bootstrap
+      docker exec $(getContainerName "scm3") ozone --daemon start scm
+      docker exec $(getContainerName "scm3") ozone scm --bootstrap
+      docker exec $(getContainerName "scm2") ozone --daemon start scm
+
+      docker exec $(getContainerName "om1") ozone om --init
+      docker exec $(getContainerName "om1") ozone --daemon start om 
+      docker exec $(getContainerName "om2") ozone om --init
+      docker exec $(getContainerName "om2") ozone --daemon start om 
+      docker exec $(getContainerName "om3") ozone om --init
+      docker exec $(getContainerName "om3") ozone --daemon start om 
+
+      docker exec $(getContainerName "dn1") ozone --daemon start datanode
+      docker exec $(getContainerName "dn2") ozone --daemon start datanode
+      docker exec $(getContainerName "dn3") ozone --daemon start datanode
+      
+      return 0;;
+    *)
+      echo "Invalid argument!"
+      echo "Usage: cluster <argument>"
+      echo "	<argument>"
+      echo "		start	-	Start Ozone Docker Cluster"
+      echo "		stop 	-	Stop Ozone Docker Cluster"
+      echo "		status	-	Print Ozone Docker Cluster Status"
+          
+  esac
+}
+
+
+alias cluster-start='cd $OZONE_DIR/ozone; docker-compose up --scale datanode=3 -d; cd - > /dev/null'
+alias cluster-stop='cd $OZONE_DIR/ozone; docker-compose down; cd - > /dev/null'
+alias cluster-status='cd $OZONE_DIR/ozone; docker-compose ps; cd - > /dev/null'
 alias scm-ui='open http://127.0.0.1:9876/'
 alias om-ui='open http://127.0.0.1:9874/'
 
-alias lab-cluster-start='cd $OZONE_DIR/ozone-lab; docker-compose up --scale datanode=3 -d'
-alias lab-cluster-stop='cd $OZONE_DIR/ozone-lab; docker-compose down'
-alias lab-cluster-status='cd $OZONE_DIR/ozone-lab; docker-compose ps'
+alias lab-cluster-start='cd $OZONE_DIR/ozone-lab; docker-compose up --scale datanode=3 -d; cd - > /dev/null'
+alias lab-cluster-stop='cd $OZONE_DIR/ozone-lab; docker-compose down; cd - > /dev/null'
+alias lab-cluster-status='cd $OZONE_DIR/ozone-lab; docker-compose ps; cd - > /dev/null'
 
 goto () {
     echo ssh into $(getContainerName $1)
@@ -36,6 +92,19 @@ gotolab () {
     docker exec -it $(getLabContainerName $1) /bin/bash
 }
 
+ozone () {
+    cd $OZONE_DIR/ozone;
+    docker-compose ps | grep scm > /dev/null 2>&1
+
+    if [ $? != 0 ]; then
+      echo "Ozone not running!"
+      echo "Start Ozone using ozone-docker command"
+      cd - > /dev/null
+      return 1;
+    fi
+    cd - >/dev/null
+    docker exec $(getContainerName "scm1") ozone $@
+}
 
 getContainerName() {
   case $1 in

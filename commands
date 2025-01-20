@@ -2,7 +2,7 @@
 # SCM Commands
 ozone scm --init
 ozone scm --bootstrap
-ozone --daemin start scm
+ozone --daemon start scm
 
 # OM Commands
 ozone om --init
