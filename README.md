@@ -486,12 +486,15 @@ cat hdds/hdds/<Cluster ID>/current/containerDir0/1/metadata/1.container
 Replication Manager will try to retain at least one replica per unique Origin Node ID.
 
 # Block Management
-
+TODO
 Block Allocation
 
 Block Deletion - Deletion Ack
 
 Delete Block retry count - How to reset the retry count for txns
+```bash
+ozone debug ldb --db=$scm_db_path scan --cf deletedBlocks --count
+```
 
 Get the count of pending block delete transactions from SCM db
 
@@ -505,7 +508,7 @@ Get the count of pending block delete transactions from SCM db
 At least one replica of all the `CLOSED`/`QUASI_CLOSED` containers should be reported to SCM for this rule validation to succeed.
 
 ```bash
-"hdds.scm.safemode.threshold.pct
+hdds.scm.safemode.threshold.pct
 ```
 Default value is 0.99
 
