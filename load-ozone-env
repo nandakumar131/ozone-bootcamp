@@ -123,3 +123,31 @@ getContainerName() {
   esac
 }
 
+alias lab-cluster-start='cd $OZONE_DIR/ozone-lab; docker-compose up --scale datanode=3 -d; cd - > /dev/null'
+alias lab-cluster-stop='cd $OZONE_DIR/ozone-lab; docker-compose down; cd - > /dev/null'
+alias lab-cluster-status='cd $OZONE_DIR/ozone-lab; docker-compose ps; cd - > /dev/null'
+
+
+
+gotolab () {
+    echo ssh into $(getLabContainerName $1)
+    docker exec -it $(getLabContainerName $1) /bin/bash
+}
+
+
+getLabContainerName() {
+  case $1 in
+    scm1)  echo "ozone-lab-scm1-1" ;;
+    scm2)  echo "ozone-lab-scm2-1" ;;
+    scm3)  echo "ozone-lab-scm3-1" ;;
+    scm4)  echo "ozone-lab-scm4-1" ;;
+    scm5)  echo "ozone-lab-scm5-1" ;;
+    om1)  echo "ozone-lab-om1-1" ;;
+    om2)  echo "ozone-lab-om2-1" ;;
+    om3)  echo "ozone-lab-om3-1" ;;
+    dn1)  echo "ozone-lab-datanode-1" ;;
+    dn2)  echo "ozone-lab-datanode-2" ;;
+    dn3)  echo "ozone-lab-datanode-3" ;;
+    *)     echo "None";;
+  esac
+}

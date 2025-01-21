@@ -393,36 +393,95 @@ Pipeline will be closed only if
 - Now the Pipeline can be used for Container allocation.
 - The Pipelines which are in `ALLOCATED` state for a long time will be deleted by the scrubber.
 
-There are two ways in which Pipelines are created
+Following are the ways in which Pipelines can be created
 - Background Pipeline Creator
-- We also try to created a Pipeline if there is a write request and we don't have any open Pipeline
+- We will alos created a Pipeline if there is a write request and we don't have any open Pipelines
+- Using create Pipeline command
+```bash
+ozone admin pipeline create
+```
 
 ### Pipeline Scrubber
 Pipelines in allocated state for long time will be removed by scrubber
 The timeout can be configued using `ozone.scm.pipeline.allocated.timeout`, the default value is 5 minutes.
 
 ### Pipeline Close Flow
-We give some time for containers to get gracefully closed before closing the pipeline.
-This is done to avoid moving the containers to `QUASI_CLOSED` state.
-<<TODO>
+
+- The Pipeline is moved to `CLOSED` state
+- We give some time for containers to get gracefully close before we delete the Pipeline.
+    - This is done to avoid moving the containers to `QUASI_CLOSED` state.
+- After `ozone.scm.pipeline.destroy.timeout` the Pipeline is deleted from SCM and
+Delete Pipeline Comands are sent to Datanodes.
+
+Pipeline Action from Datanode
+Log to grep for in Datanode
+```java
+LOG.error("pipeline Action {} on pipeline {}.Reason : {}",
+           action.getAction(), pipelineID,
+           action.getClosePipeline().getDetailedReason());
+```
+
+### What is `DORMANT` state?
+- This state is introduced for troubleshooting and debugging purposes.
+- If you close a Pipeline,  the datanodes that were part of the Pipeline becomes available and the
+Background Pipeline Creator will try to create a new Pipeline.
+- In situations where you want to restrict your container writes to a specific set of datanodes (Pipelines),
+you can deactivate the other Pipelines in the cluster.
+- Deactivating a Pipeline will move the Pipeline to `DORMANT` state.
+- Pipelines in `DORMANT` state will not be closed or deleted,
+at the same time they are not used for writes.
+- Once you're done with your troubleshooting, you can activate the Pipeline and it will be moved to `OPEN` state.
+
+Listing all the available Pipelines
+```bash
+ozone admin pipeline list
+```
+Deactivating a Pipeline
+```bash
+ozone admin pipeline deactivate <pipelineId>
+```
+
+Activating the Pipeline
+```bash
+ozone admin pipeline activate <pipelineId>
+```
 
 ### Exercise
-Stop one of the datanode in the pipeline and check the pipeline state and also the state of Containers in the Pipeline.
-<<TODO>>
+- Perform a Pipeline close using command.
+```bash
+ozone admin pipeline close <pipelineId>
+```
+- Trigger Pipeline close by stopping one of the datanode in the pipeline.
+    - Check for the `Pipeline Action` logs in the other two Datanodes.
 
 # Container Lifecycle
 
+## Container State Transition
 ![container-state-transition.drawio.png](flowcharts/container-state-transition.png)
 
+## Container State Flow
 ![container-state-flow.drawio.png](flowcharts/container-state-flow.png)
 
-TODO: Container creation logic
+Container creation logic
 Clients create the container. The containers are directly moved to OPEN state in SCM upon creation.
 There is no allocated state for containers.
 
-3 way commit, falling back to 2 way commit.
+The number of `OPEN` containers in a pipeline is controlled by `ozone.scm.pipeline.owner.container.count`.
 
-Quasi closed to close — Origin Node ID logic
+## Exercise
+- Check the number of `OPEN` containers for a Pipeline in the cluster
+```bash
+ozone admin container info <containerId>
+```
+
+### Container file on Datanode
+```bash
+cat hdds/hdds/<Cluster ID>/current/containerDir0/1/metadata/1.container
+```
+### Why do we need `QUASI_CLOSED` state?
+- When the container is not closed via Ratis, one of the replica could be lagging behind.
+
+### How are `QUASI_CLOSED` containers closed?
 
 Replication Manager will try to retain at least one replica per unique Origin Node ID.
 
@@ -439,20 +498,46 @@ Get the count of pending block delete transactions from SCM db
 # Safemode
 
 ## Pre-check
-
 - What is pre-check?
 - What problem does pre-check logic solve?
 
 ## Container Safemode Rule
+At least one replica of all the `CLOSED`/`QUASI_CLOSED` containers should be reported to SCM for this rule validation to succeed.
 
-At least one replica of all the CLOSED/QUASI_CLOSED containers should be reported to SCM for this rule validation to succeed.
+```bash
+"hdds.scm.safemode.threshold.pct
+```
+Default value is 0.99
 
 ## Datanode Safemode Rule
+Configured number of datanodes should be registered with SCM for this rule validation to succeed.
+```bash
+hdds.scm.safemode.min.datanode
+```
+Default value is 1.
+This Rule is part of pre-check.
 
 ## Healthy Pipeline Safemode Rule
+This rule defines percentage of healthy pipelines need to be reported.
+Once safe mode exit happens, this rules take care of writes can go
+through in a cluster.
+
+```bash
+hdds.scm.safemode.healthy.pipeline.pct
+```
+Default value is 0.10
 
 ## One Replica Pipeline Safemode Rule
+This rule covers whether we have at least one datanode is reported for each
+open pipeline. This rule is for all open containers, we have at least one
+replica available for read when we exit safe mode.
 
+```bash
+hdds.scm.safemode.atleast.one.node.reported.pipeline.pct
+```
+Default value is 0.90
+
+## Safemode Behaviour
 ### OM Operations
 
 | **Client Operation** | **Expected Behaviour** |
@@ -476,20 +561,23 @@ At least one replica of all the CLOSED/QUASI_CLOSED containers should be reporte
 ```bash
 ozone admin safemode status --verbose
 ```
-
 Check SCM Web UI for details.
 
 ### Problem
-
-Try to put cluster into safemode and verify the client commands.
+- Try to put cluster into safemode and verify the client commands.
 
 # Disk Layout
 
 ![scm-metadata.png](flowcharts/scm-metadata.png)
 
-Cat the version file
-
-Read Raft Log using ldb tool
+The version file
+```bash
+cat /data/metadata/scm/current/VERSION
+```
+Parse Raft Log file
+```bash
+ozone debug ratislogparser scm -s=/<Ratis Dir>/<Raft Group ID>/current/log_inprogress_1
+```
 
 # High Availability
 
@@ -497,14 +585,67 @@ Read Raft Log using ldb tool
 
 There is not much difference in HA and Non-HA code path in SCM. We have single node Ratis for Non-HA setup.
 
+The Services run only on the leader SCM.
+- Pipeline Creation Service
+- Block Deletion Service
+- Replication Manager
+
+The SafemodeRules are executed locally on all the SCMs.
+The Safemode state is not shared via Ratis.
+
 Datanodes seen by SCMs might vary if there are network partitions.
 
 # Decommissioning
+Decommissioning is a process of removing a SCM from the cluster gracefully.
+```bash
+ozone admin scm decommission -nodeid=<nodeId>
+```
+Decommissioning command need Ratis quorum to succeed.
 
-What happens if you remove node without decommissioning and add new nodes?
+### Exercise
+What happens if you remove node without decommissioning and add new SCM node?
 
 # Recover from two SCM failure
+- In case of two node failure, we have a potential dataloss as we don't have quorum anymore.
+- Since there is no quorum, we cannot run decommission command.
 
-Ratis log parser
+We have to reconfigure this as single node Ratis Ring.
+
+- Identify the SCM node peer id of the healthy SCM
+```bash
+cat /data/metadata/scm/current/VERSION
+```
+Verify this with the content from raft-meta.conf
+```bash
+cat /data/metadata/scm-ha/<Raft Group ID>/current/raft-meta.conf
+```
+Get the Peer ID
+Stop the SCM service if it's running
+
+Take a backup of the raft-meta.conf file
+
+Run the below command to generate new raft-meta.conf file
+```bash
+ozone ratis local raftMetaConf -peers e54364cd-7453-41c1-bfdd-29365f269e7b\|scm1:9894 -path /data/metadata/scm-ha/f5591d01-4ca6-4ffe-ba28-73b051b8947c/current
+```
+
+Rename the new-raft-meta.conf file to raft-meta.conf
+```bash
+mv /data/metadata/scm-ha/f5591d01-4ca6-4ffe-ba28-73b051b8947c/current/new-raft-meta.conf /data/metadata/scm-ha/f5591d01-4ca6-4ffe-ba28-73b051b8947c/current/raft-meta.conf
+```
+
+Start the SCM service
+```bash
+ozone --daemon start scm
+```
+
+Check the status of the SCM service
+```bash
+ozone admin scm roles
+```
+Bootstrap two new SCM nodes to make it HA again.
+
+Note:
+Use Ratis log parser on Raft log to get idea on the last committed transaction on the healthy SCM.
 
 # Datanode Heartbeat Protocol
