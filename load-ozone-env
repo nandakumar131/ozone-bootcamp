@@ -17,6 +17,12 @@ if [ -z "$OZONE_DIR" ]; then
  return
 fi
 
+alias cluster-start='cd $OZONE_DIR/ozone; docker-compose up --scale datanode=3 -d; cd - > /dev/null'
+alias cluster-stop='cd $OZONE_DIR/ozone; docker-compose down; cd - > /dev/null'
+alias cluster-status='cd $OZONE_DIR/ozone; docker-compose ps; cd - > /dev/null'
+alias scm-ui='open http://127.0.0.1:9876/'
+alias om-ui='open http://127.0.0.1:9874/'
+
 cluster () {
   case $1 in
     start)  cluster-start ;;
@@ -82,12 +88,6 @@ cluster () {
   esac
 }
 
-
-alias cluster-start='cd $OZONE_DIR/ozone; docker-compose up --scale datanode=3 -d; cd - > /dev/null'
-alias cluster-stop='cd $OZONE_DIR/ozone; docker-compose down; cd - > /dev/null'
-alias cluster-status='cd $OZONE_DIR/ozone; docker-compose ps; cd - > /dev/null'
-alias scm-ui='open http://127.0.0.1:9876/'
-alias om-ui='open http://127.0.0.1:9874/'
 
 goto () {
     echo ssh into $(getContainerName $1)
