@@ -189,7 +189,6 @@ To view the metadata, we have to generate some first.
 ```bash
 ozone sh volume create /vol
 ozone sh bucket create /vol/buck
-ozone sh key put
 ozone sh key put /vol/buck/CONTRIBUTING.md  CONTRIBUTING.md
 ozone sh key list /vol/buck
 ozone sh key cat /vol/buck/CONTRIBUTING.md
@@ -486,17 +485,31 @@ cat hdds/hdds/<Cluster ID>/current/containerDir0/1/metadata/1.container
 Replication Manager will try to retain at least one replica per unique Origin Node ID.
 
 # Block Management
-TODO
-Block Allocation
+## Block Allocation
+- On Open Containers
+- Sequence ID generator
+- Only done on leader
 
-Block Deletion - Deletion Ack
+## Block Deletion
+- Sent only for closed containers
+- The datanode marks the block for deletion and sends the ack
+- Deletion ack should be received from all the replicas (three datanodes)
 
-Delete Block retry count - How to reset the retry count for txns
+Note: Recent improvement is to send block delete command only if the contianer
+has three healthy replicas.
+
+There is a delete Block retry count. If the retry count exceeds the configured value,
+SCM will not retry the block deletion.
+
+### Get the number of pending transactions in SCM
 ```bash
 ozone debug ldb --db=$scm_db_path scan --cf deletedBlocks --count
 ```
 
-Get the count of pending block delete transactions from SCM db
+### How to reset the retry count for txns?
+```bash
+ozone admin scm deletedBlocksTxn reset
+```
 
 # Safemode
 
